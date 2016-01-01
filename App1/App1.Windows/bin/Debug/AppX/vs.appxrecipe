@@ -26,7 +26,7 @@
   <ItemGroup>
     <AppxPackagedFile Include="C:\Users\Daniel\OneDrive\Ashwin\Visual Studio\App1\App1\App1.Windows\bin\Debug\App1.Windows.exe">
       <PackagePath>App1.Windows.exe</PackagePath>
-      <Modified>2015-12-31T07:12:39.492</Modified>
+      <Modified>2016-01-01T08:43:43.509</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\Daniel\OneDrive\Ashwin\Visual Studio\App1\App1\App1.Windows\Assets\Logo.scale-100.png">
       <PackagePath>Assets\Logo.scale-100.png</PackagePath>
@@ -66,11 +66,11 @@
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\Daniel\OneDrive\Ashwin\Visual Studio\App1\App1\App1.Windows\bin\Debug\MainPage.xbf">
       <PackagePath>MainPage.xbf</PackagePath>
-      <Modified>2015-12-25T04:16:09.751</Modified>
+      <Modified>2016-01-01T07:39:25.582</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\Daniel\OneDrive\Ashwin\Visual Studio\App1\App1\App1.Windows\bin\Debug\App1.Windows.xr.xml">
       <PackagePath>App1.Windows.xr.xml</PackagePath>
-      <Modified>2015-12-25T04:15:55.436</Modified>
+      <Modified>2016-01-01T07:39:25.571</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\Daniel\OneDrive\Ashwin\Visual Studio\App1\App1\App1.Windows\bin\Debug\resources.pri">
       <PackagePath>resources.pri</PackagePath>

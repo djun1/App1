@@ -3,13 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-//using System.Net.Http;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
-using Windows.Storage;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -17,11 +15,9 @@ using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
+using Windows.Storage;
 using Windows.Web.Http;
-using Windows.Storage.Streams;
-using Windows.UI.Popups;
-
-
+using Windows.UI.ApplicationSettings;
 
 // The Basic Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=234237
 
@@ -35,11 +31,16 @@ namespace App1
 
         private NavigationHelper navigationHelper;
         private ObservableDictionary defaultViewModel = new ObservableDictionary();
-        public static string File;
-        private static string HomeStation;
+        private static List<string> Files = new List<string>();
+        private static string BaseURL;
         private static HttpClient Client;
         private StorageFolder DataFolder;
-        private static string DataFile;
+        private StorageFile DataFile;
+        private static HttpResponseMessage Message;
+        private static string HomeStation;
+        private static string HomeStationURL;
+        private static string DataType;
+
 
         /// <summary>
         /// This can be changed to a strongly typed view model.
@@ -119,91 +120,113 @@ namespace App1
 
         private async void DownloadButton_Click(object sender, RoutedEventArgs e)
         {
-            //StatusText.Text = String.Empty;
+            int i;
 
+            StatusText.Text = String.Empty;
             DataFolder = await ApplicationData.Current.TemporaryFolder.CreateFolderAsync("Files", CreationCollisionOption.OpenIfExists);
-            HomeStation = "http://dd.weather.gc.ca/bulletins/alphanumeric/20151229/SA/CYVR/05/";
-            File = "SACN62_CYVR_290500___36812";
-            await GetListOfLatestFiles(File);
-            await GetDataUsingHTTP(HomeStation, DataFolder, File);
 
+            await GetListOfLatestFiles(Files);
 
-      
+            for (i = 0; i < Files.Count(); i++)
+            {
+                await GetDataUsingHTTP(HomeStationURL.Substring(0, HomeStationURL.Length - 3) + Files[i], DataFolder, Files[i]);
 
-            //Alternate method, but unsure how to handle max i and when lines < i
-            //IList<string> lines = await FileIO.ReadLinesAsync(file);
+                // Print text from file in textblock.
+                var Text = await FileIO.ReadLinesAsync(DataFile);
 
-            //for (int i = 1; i <= 5; i++ )
-            //{
-            //    StatusText.Text += lines[i];
-            //    if (lines == null) break; ??
-            //}
+                foreach (var line in Text.AsEnumerable().Skip(1))
+                {
+                    StatusText.Text += line + "\r\n";
+                }
+            }
         }
 
-        public static async Task GetListOfLatestFiles(string FileNames)
+        public static async Task GetListOfLatestFiles(List<string> FileNames)
         {
+            int i;
             Uri URI;
-            //string FileString;
-
-            //FileNames.Clear();
-            if (Client == null)
-                Client = new HttpClient();
-
-            //HomeStation = "http://dd.weather.gc.ca/bulletins/alphanumeric/20151229/SA/CYVR/05/";
-
-            URI = new Uri(HomeStation + FileNames);
-
-            //FileString = "SACN62_CYVR_290500___36812";
-
-            //FileNames.Add(FileString);
-
-            //var Message = await Client.GetAsync(URI);
-            //var Content = await Message.Content.ReadAsStringAsync();
-
-
-            Client.Dispose();
-        }
-
-        public async Task GetDataUsingHTTP(string URL, StorageFolder Folder, string FileNames)
-        {
-            var URI = new Uri(URL + FileNames);
-            StorageFile DataFile;
+            string StartDateTimeString;
+            Regex RegEx;
+            string RegExString;
+            DateTime CurrDateTime = DateTime.Now.ToUniversalTime();
+            DateTime StartDateTime;
+            BaseURL = "http://dd.weather.gc.ca/bulletins/alphanumeric/";
 
             HttpClient Client = new HttpClient();
 
-            var Message = await Client.GetAsync(URI);
-            var Content = await Message.Content.ReadAsStringAsync();
+            HomeStation = "CYVR";
 
-            DataFile = await Folder.CreateFileAsync(FileNames, CreationCollisionOption.ReplaceExisting);
-            await FileIO.WriteTextAsync(DataFile, Content);
-
-
-            StorageFile File = await Folder.GetFileAsync(FileNames);
-
-            var Text = await FileIO.ReadLinesAsync(DataFile);
-
-            foreach (var line in Text.AsEnumerable().Skip(1))
+            for (i = 0; i < 3; i++)
             {
-                StatusText.Text += line + "\r\n";
+                DataType = "SA"; 
+                StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
+                StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
+                    + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + HomeStation + "/"
+                    + StartDateTime.Hour.ToString("D2") + "/";
+                HomeStationURL = BaseURL + StartDateTimeString;
+                URI = new Uri(HomeStationURL);
+
+                RegExString = ">[A-Z]+[0-9]+_" + HomeStation + "_[0-9]+___[0-9]+<";
+
+                var HttpClientTask = Client.GetAsync(URI);
+                RegEx = new Regex(RegExString);
+                Message = await HttpClientTask;
+
+                MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
+
+                foreach (Match match in Matches)
+                {
+                    if (match.Success)
+                    {
+                        string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
+                        FileNames.Add(StartDateTime.Hour.ToString("D2") + "/" + tmp.Substring(1, tmp.Length - 2));
+                    }
+                }
+            }
+
+            for (i = 0; i < 6; i++)
+            {
+                DataType = "FT";
+                StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
+                StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
+                    + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + "CWAO" + "/"
+                    + StartDateTime.Hour.ToString("D2") + "/";
+                HomeStationURL = BaseURL + StartDateTimeString;
+                URI = new Uri(HomeStationURL);
+
+                RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+__" + HomeStation + "_[0-9]+<";
+
+                var HttpClientTask = Client.GetAsync(URI);
+                RegEx = new Regex(RegExString);
+                Message = await HttpClientTask;
+
+                MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
+
+                foreach (Match match in Matches)
+                {
+                    if (match.Success)
+                    {
+                        string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
+                        FileNames.Add(StartDateTime.Hour.ToString("D2") + "/" + tmp.Substring(1, tmp.Length - 2));
+                    }
+                }
             }
 
             Client.Dispose();
         }
 
-        //public static async Task GetMETARUsingHTTP()
-        //{
-        //    Uri uri = new Uri("http://dd.weather.gc.ca/bulletins/alphanumeric/20151229/SA/CYVR/05/SACN62_CYVR_290500___36812");
-        //    HttpClient Client = new HttpClient();
+        public async Task GetDataUsingHTTP(string URL, StorageFolder Folder, string File)
+        {
+            var URI = new Uri(URL);
+            HttpClient Client = new HttpClient();
 
-        //    var Message = await Client.GetAsync(uri);
-        //    var Content = await Message.Content.ReadAsStringAsync();
+            var Message = await Client.GetAsync(URI);
+            var Content = await Message.Content.ReadAsStringAsync();
 
-        //    StorageFolder Folder = await ApplicationData.Current.TemporaryFolder.CreateFolderAsync("Files", CreationCollisionOption.OpenIfExists);
-        //    StorageFile File = await Folder.CreateFileAsync("METAR.txt", CreationCollisionOption.ReplaceExisting);
+            DataFile = await Folder.CreateFileAsync(File.Substring(3), CreationCollisionOption.ReplaceExisting);
+            await FileIO.WriteTextAsync(DataFile, Content);
 
-        //    await FileIO.WriteTextAsync(File, Content);
-
-        //    Client.Dispose();
-        //}
+            Client.Dispose();
+        }
     }
 }
