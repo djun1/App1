@@ -125,6 +125,8 @@ namespace App1
             StatusText.Text = String.Empty;
             DataFolder = await ApplicationData.Current.TemporaryFolder.CreateFolderAsync("Files", CreationCollisionOption.OpenIfExists);
 
+            Files.Clear();
+
             await GetListOfLatestFiles(Files);
 
             for (i = 0; i < Files.Count(); i++)
@@ -132,6 +134,7 @@ namespace App1
                 await GetDataUsingHTTP(HomeStationURL.Substring(0, HomeStationURL.Length - 3) + Files[i], DataFolder, Files[i]);
 
                 // Print text from file in textblock.
+
                 var Text = await FileIO.ReadLinesAsync(DataFile);
 
                 foreach (var line in Text.AsEnumerable().Skip(1))
@@ -139,6 +142,25 @@ namespace App1
                     StatusText.Text += line + "\r\n";
                 }
             }
+
+            Files.Clear();
+
+            await GetListOfAdditionalLatestFiles(Files);
+
+            for (i = 0; i < Files.Count(); i++)
+            {
+                await GetDataUsingHTTP(HomeStationURL.Substring(0, HomeStationURL.Length - 3) + Files[i], DataFolder, Files[i]);
+
+                // Print text from file in textblock.
+
+                var Text = await FileIO.ReadLinesAsync(DataFile);
+
+                foreach (var line in Text.AsEnumerable().Skip(1))
+                {
+                    StatusText.Text += line + "\r\n";
+                }
+            }
+
         }
 
         public static async Task GetListOfLatestFiles(List<string> FileNames)
@@ -156,7 +178,7 @@ namespace App1
 
             HomeStation = "CYVR";
 
-            for (i = 0; i < 3; i++)
+            for (i = 0; i < 4; i++)
             {
                 DataType = "SA"; 
                 StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
@@ -183,6 +205,24 @@ namespace App1
                     }
                 }
             }
+
+            Client.Dispose();
+        }
+
+        public static async Task GetListOfAdditionalLatestFiles(List<string> FileNames)
+        {
+            int i;
+            Uri URI;
+            string StartDateTimeString;
+            Regex RegEx;
+            string RegExString;
+            DateTime CurrDateTime = DateTime.Now.ToUniversalTime();
+            DateTime StartDateTime;
+            BaseURL = "http://dd.weather.gc.ca/bulletins/alphanumeric/";
+
+            HttpClient Client = new HttpClient();
+
+            HomeStation = "CYVR";
 
             for (i = 0; i < 6; i++)
             {

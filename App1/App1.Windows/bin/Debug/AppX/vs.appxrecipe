@@ -26,7 +26,7 @@
   <ItemGroup>
     <AppxPackagedFile Include="C:\Users\Daniel\OneDrive\Ashwin\Visual Studio\App1\App1\App1.Windows\bin\Debug\App1.Windows.exe">
       <PackagePath>App1.Windows.exe</PackagePath>
-      <Modified>2016-01-01T08:43:43.509</Modified>
+      <Modified>2016-01-01T19:03:12.334</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\Daniel\OneDrive\Ashwin\Visual Studio\App1\App1\App1.Windows\Assets\Logo.scale-100.png">
       <PackagePath>Assets\Logo.scale-100.png</PackagePath>
