@@ -31,16 +31,16 @@ namespace App1
 
         private NavigationHelper navigationHelper;
         private ObservableDictionary defaultViewModel = new ObservableDictionary();
-        private static List<string> Files = new List<string>();
+        private static List<string> DataFiles = new List<string>();
+        private static List<string> HomeStationURLs = new List<string>();
+        private static List<string> SortedURLs = new List<string>();
         private static string BaseURL;
-        private static HttpClient Client;
         private StorageFolder DataFolder;
         private StorageFile DataFile;
         private static HttpResponseMessage Message;
         private static string HomeStation;
         private static string HomeStationURL;
-        private static string DataType;
-
+        private static string[] DataTypeArray = { "SA", "SP", "FT", "FB", "FA" };
 
         /// <summary>
         /// This can be changed to a strongly typed view model.
@@ -58,7 +58,6 @@ namespace App1
         {
             get { return this.navigationHelper; }
         }
-
 
         public MainPage()
         {
@@ -120,105 +119,78 @@ namespace App1
 
         private async void DownloadButton_Click(object sender, RoutedEventArgs e)
         {
-            DataFolder = await ApplicationData.Current.TemporaryFolder.CreateFolderAsync("Files", CreationCollisionOption.OpenIfExists);
-            await GetListOfLatestFiles(Files);
-        }
-
-        public async Task GetListOfLatestFiles(List<string> FileNames)
-        {
-            int i, j;
-            Uri URI;
+            int i;
+            HomeStation = "CYJT";
             BaseURL = "http://dd.weather.gc.ca/bulletins/alphanumeric/";
+            DataFolder = await ApplicationData.Current.TemporaryFolder.CreateFolderAsync("Files", CreationCollisionOption.OpenIfExists);
+            
+            await GetListOfLatestFiles(HomeStationURLs, DataFiles, "SA");
+            await GetListOfLatestFiles(HomeStationURLs, DataFiles, "SP");
+            await GetListOfLatestFiles(HomeStationURLs, DataFiles, "FT");
+            for (i = 0; i < DataFiles.Count(); i++)
+            {
+                // Sort URLs here.
+
+
+                await GetDataUsingHTTP(HomeStationURLs[i], DataFolder, DataFiles[i]);
+
+                
+
+                var Text = await FileIO.ReadLinesAsync(DataFile);
+                foreach (var line in Text.AsEnumerable().Skip(1))
+                {
+                    StatusText.Text += line + "\r\n";
+                }
+            }
+        }
+       
+        public async Task GetListOfLatestFiles(List<string> URLs, List<string> FileNames, string DataType)
+        {
+            int i;
+            Uri URI;
             DateTime CurrDateTime = DateTime.Now.ToUniversalTime();
             DateTime StartDateTime;
             string StartDateTimeString;
-            string[] DataTypeArray = { "SA", "SP", "FT", "FB", "FA" };
             string[] TAFAmendArray = { "", "AAA" };
             Regex RegEx;
             string RegExString;
 
+
+            
             HttpClient Client = new HttpClient();
 
-            HomeStation = "CYBL";
-
-            foreach (string DataType in DataTypeArray)
+            for (i = 0; i < 3; i++) //Get list of METARs and SPECIs for the past 3 hours.
             {
-                for (i = 0; i < 3; i++) //Download METARs and SPECIs.
+                StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
+                StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
+                    + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + HomeStation + "/"
+                    + StartDateTime.Hour.ToString("D2") + "/";
+                HomeStationURL = BaseURL + StartDateTimeString;
+                URI = new Uri(HomeStationURL);
+
+                RegExString = ">[A-Z]+[0-9]+_" + HomeStation + "_[0-9]+___[0-9]+<";
+
+                var HttpClientTask = Client.GetAsync(URI);
+                RegEx = new Regex(RegExString);
+                Message = await HttpClientTask;
+
+                MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
+
+                foreach (Match match in Matches)
                 {
-                    StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
-                    StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
-                        + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + HomeStation + "/"
-                        + StartDateTime.Hour.ToString("D2") + "/";
-                    HomeStationURL = BaseURL + StartDateTimeString;
-                    URI = new Uri(HomeStationURL);
-
-                    RegExString = ">[A-Z]+[0-9]+_" + HomeStation + "_[0-9]+___[0-9]+<";
-
-                    var HttpClientTask = Client.GetAsync(URI);
-                    RegEx = new Regex(RegExString);
-                    Message = await HttpClientTask;
-
-                    MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
-
-                    foreach (Match match in Matches)
+                    if (match.Success)
                     {
-                        if (match.Success)
-                        {
-                            string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
-                            string File = tmp.Substring(1, tmp.Length - 2);
-                            await GetDataUsingHTTP(HomeStationURL + File, DataFolder, File);
-                            var Text = await FileIO.ReadLinesAsync(DataFile);
-
-                            foreach (var line in Text.AsEnumerable().Skip(1))
-                            {
-                                StatusText.Text += line + "\r\n";
-                            }
-                        }
+                        string tmp = match.ToString();
+                        FileNames.Add(tmp.Substring(1, tmp.Length - 2));
+                        URLs.Add(HomeStationURL + tmp.Substring(1, tmp.Length - 2));
                     }
                 }
 
-                if (DataType.Equals("FT")) //Download TAF and TAF Amends.
-                {
-                    foreach (string TAFAmend in TAFAmendArray)
-                    {
-                        for (i = 0; i < 6; i++)
-                        {
-                            StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
-                            StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
-                                + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + "CWAO" + "/"
-                                + StartDateTime.Hour.ToString("D2") + "/";
-                            HomeStationURL = BaseURL + StartDateTimeString;
+            }
 
-                            URI = new Uri(HomeStationURL);
-
-                            RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+_" + TAFAmend + "_" + HomeStation + "_[0-9]+<";
-
-                            var HttpClientTask = Client.GetAsync(URI);
-                            RegEx = new Regex(RegExString);
-                            Message = await HttpClientTask;
-
-                            MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
-
-                            foreach (Match match in Matches)
-                            {
-                                if (match.Success)
-                                {
-                                    string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
-                                    string File = tmp.Substring(1, tmp.Length - 2);
-                                    await GetDataUsingHTTP(HomeStationURL + File, DataFolder, File);
-                                    var Text = await FileIO.ReadLinesAsync(DataFile);
-
-                                    foreach (var line in Text.AsEnumerable().Skip(1))
-                                    {
-                                        StatusText.Text += line + "\r\n";
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                else if (DataType.Equals("FB")) //Download Upper Winds.
+            if (DataType.Equals("FT")) //Get list of TAF and TAF Amends for the past 6 hours.
+            {
+                foreach (string TAFAmend in TAFAmendArray)
                 {
                     for (i = 0; i < 6; i++)
                     {
@@ -230,7 +202,7 @@ namespace App1
 
                         URI = new Uri(HomeStationURL);
 
-                        RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+___+[0-9]+<";
+                        RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+_" + TAFAmend + "_" + HomeStation + "_[0-9]+<";
 
                         var HttpClientTask = Client.GetAsync(URI);
                         RegEx = new Regex(RegExString);
@@ -242,58 +214,77 @@ namespace App1
                         {
                             if (match.Success)
                             {
-                                string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
-                                string File = tmp.Substring(1, tmp.Length - 2);
-                                await GetDataUsingHTTP(HomeStationURL + File, DataFolder, File);
-                                var Text = await FileIO.ReadLinesAsync(DataFile);
-
-                                foreach (var line in Text.AsEnumerable().Skip(1))
-                                {
-                                    StatusText.Text += line + "\r\n";
-                                }
+                                string tmp = match.ToString();
+                                FileNames.Add(tmp.Substring(1, tmp.Length - 2));
+                                URLs.Add(HomeStationURL + tmp.Substring(1, tmp.Length - 2));
                             }
                         }
                     }
-
                 }
 
-                else if (DataType.Equals("FA")) //Download VFR Route Forecast (available Mar-Oct only).
+            }
+
+            else if (DataType.Equals("FB")) //Get list of Upper Winds.
+            {
+                for (i = 0; i < 6; i++)
                 {
-                    for (i = 0; i < 6; i++)
+                    StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
+                    StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
+                        + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + "CWAO" + "/"
+                        + StartDateTime.Hour.ToString("D2") + "/";
+                    HomeStationURL = BaseURL + StartDateTimeString;
+
+                    URI = new Uri(HomeStationURL);
+
+                    RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+___+[0-9]+<";
+
+                    var HttpClientTask = Client.GetAsync(URI);
+                    RegEx = new Regex(RegExString);
+                    Message = await HttpClientTask;
+
+                    MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
+
+                    foreach (Match match in Matches)
                     {
-                        StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
-                        StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
-                            + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + "CWEG" + "/"
-                            + StartDateTime.Hour.ToString("D2") + "/";
-                        HomeStationURL = BaseURL + "20150805/FA/CWEG/22/";
-
-                        URI = new Uri(HomeStationURL);
-
-                        RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+___+[0-9]+<";
-
-                        var HttpClientTask = Client.GetAsync(URI);
-                        RegEx = new Regex(RegExString);
-                        Message = await HttpClientTask;
-
-                        MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
-
-                        foreach (Match match in Matches)
+                        if (match.Success)
                         {
-                            if (match.Success)
-                            {
-                                string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
-                                string File = tmp.Substring(1, tmp.Length - 2);
-                                await GetDataUsingHTTP(HomeStationURL + File, DataFolder, File);
-                                var Text = await FileIO.ReadLinesAsync(DataFile);
-
-                                foreach (var line in Text.AsEnumerable().Skip(1))
-                                {
-                                    StatusText.Text += line + "\r\n";
-                                }
-                            }
+                            string tmp = match.ToString();
+                            FileNames.Add(tmp.Substring(1, tmp.Length - 2));
+                            URLs.Add(HomeStationURL + tmp.Substring(1, tmp.Length - 2));
                         }
                     }
+                }
+            }
 
+            else if (DataType.Equals("FA")) //Get list of VFR Route Forecasts (available Mar-Oct only).
+            {
+                for (i = 0; i < 6; i++)
+                {
+                    StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
+                    StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
+                        + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + "CWEG" + "/"
+                        + StartDateTime.Hour.ToString("D2") + "/";
+                    HomeStationURL = BaseURL + HomeStationURL;
+
+                    URI = new Uri(HomeStationURL);
+
+                    RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+___+[0-9]+<";
+
+                    var HttpClientTask = Client.GetAsync(URI);
+                    RegEx = new Regex(RegExString);
+                    Message = await HttpClientTask;
+
+                    MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
+
+                    foreach (Match match in Matches)
+                    {
+                        if (match.Success)
+                        {
+                            string tmp = match.ToString();
+                            FileNames.Add(tmp.Substring(1, tmp.Length - 2));
+                            URLs.Add(HomeStationURL + tmp.Substring(1, tmp.Length - 2));
+                        }
+                    }
                 }
             }
         }
