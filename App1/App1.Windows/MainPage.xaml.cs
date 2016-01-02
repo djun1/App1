@@ -120,139 +120,182 @@ namespace App1
 
         private async void DownloadButton_Click(object sender, RoutedEventArgs e)
         {
-            int i;
-
-            StatusText.Text = String.Empty;
             DataFolder = await ApplicationData.Current.TemporaryFolder.CreateFolderAsync("Files", CreationCollisionOption.OpenIfExists);
-
-            Files.Clear();
-
             await GetListOfLatestFiles(Files);
-
-            for (i = 0; i < Files.Count(); i++)
-            {
-                await GetDataUsingHTTP(HomeStationURL.Substring(0, HomeStationURL.Length - 3) + Files[i], DataFolder, Files[i]);
-
-                // Print text from file in textblock.
-
-                var Text = await FileIO.ReadLinesAsync(DataFile);
-
-                foreach (var line in Text.AsEnumerable().Skip(1))
-                {
-                    StatusText.Text += line + "\r\n";
-                }
-            }
-
-            Files.Clear();
-
-            await GetListOfAdditionalLatestFiles(Files);
-
-            for (i = 0; i < Files.Count(); i++)
-            {
-                await GetDataUsingHTTP(HomeStationURL.Substring(0, HomeStationURL.Length - 3) + Files[i], DataFolder, Files[i]);
-
-                // Print text from file in textblock.
-
-                var Text = await FileIO.ReadLinesAsync(DataFile);
-
-                foreach (var line in Text.AsEnumerable().Skip(1))
-                {
-                    StatusText.Text += line + "\r\n";
-                }
-            }
-
         }
 
-        public static async Task GetListOfLatestFiles(List<string> FileNames)
+        public async Task GetListOfLatestFiles(List<string> FileNames)
         {
-            int i;
+            int i, j;
             Uri URI;
-            string StartDateTimeString;
-            Regex RegEx;
-            string RegExString;
+            BaseURL = "http://dd.weather.gc.ca/bulletins/alphanumeric/";
             DateTime CurrDateTime = DateTime.Now.ToUniversalTime();
             DateTime StartDateTime;
-            BaseURL = "http://dd.weather.gc.ca/bulletins/alphanumeric/";
+            string StartDateTimeString;
+            string[] DataTypeArray = { "SA", "SP", "FT", "FB", "FA" };
+            string[] TAFAmendArray = { "", "AAA" };
+            Regex RegEx;
+            string RegExString;
 
             HttpClient Client = new HttpClient();
 
-            HomeStation = "CYVR";
+            HomeStation = "CYBL";
 
-            for (i = 0; i < 4; i++)
+            foreach (string DataType in DataTypeArray)
             {
-                DataType = "SA"; 
-                StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
-                StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
-                    + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + HomeStation + "/"
-                    + StartDateTime.Hour.ToString("D2") + "/";
-                HomeStationURL = BaseURL + StartDateTimeString;
-                URI = new Uri(HomeStationURL);
-
-                RegExString = ">[A-Z]+[0-9]+_" + HomeStation + "_[0-9]+___[0-9]+<";
-
-                var HttpClientTask = Client.GetAsync(URI);
-                RegEx = new Regex(RegExString);
-                Message = await HttpClientTask;
-
-                MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
-
-                foreach (Match match in Matches)
+                for (i = 0; i < 3; i++) //Download METARs and SPECIs.
                 {
-                    if (match.Success)
+                    StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
+                    StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
+                        + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + HomeStation + "/"
+                        + StartDateTime.Hour.ToString("D2") + "/";
+                    HomeStationURL = BaseURL + StartDateTimeString;
+                    URI = new Uri(HomeStationURL);
+
+                    RegExString = ">[A-Z]+[0-9]+_" + HomeStation + "_[0-9]+___[0-9]+<";
+
+                    var HttpClientTask = Client.GetAsync(URI);
+                    RegEx = new Regex(RegExString);
+                    Message = await HttpClientTask;
+
+                    MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
+
+                    foreach (Match match in Matches)
                     {
-                        string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
-                        FileNames.Add(StartDateTime.Hour.ToString("D2") + "/" + tmp.Substring(1, tmp.Length - 2));
+                        if (match.Success)
+                        {
+                            string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
+                            string File = tmp.Substring(1, tmp.Length - 2);
+                            await GetDataUsingHTTP(HomeStationURL + File, DataFolder, File);
+                            var Text = await FileIO.ReadLinesAsync(DataFile);
+
+                            foreach (var line in Text.AsEnumerable().Skip(1))
+                            {
+                                StatusText.Text += line + "\r\n";
+                            }
+                        }
                     }
                 }
-            }
 
-            Client.Dispose();
-        }
-
-        public static async Task GetListOfAdditionalLatestFiles(List<string> FileNames)
-        {
-            int i;
-            Uri URI;
-            string StartDateTimeString;
-            Regex RegEx;
-            string RegExString;
-            DateTime CurrDateTime = DateTime.Now.ToUniversalTime();
-            DateTime StartDateTime;
-            BaseURL = "http://dd.weather.gc.ca/bulletins/alphanumeric/";
-
-            HttpClient Client = new HttpClient();
-
-            HomeStation = "CYVR";
-
-            for (i = 0; i < 6; i++)
-            {
-                DataType = "FT";
-                StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
-                StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
-                    + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + "CWAO" + "/"
-                    + StartDateTime.Hour.ToString("D2") + "/";
-                HomeStationURL = BaseURL + StartDateTimeString;
-                URI = new Uri(HomeStationURL);
-
-                RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+__" + HomeStation + "_[0-9]+<";
-
-                var HttpClientTask = Client.GetAsync(URI);
-                RegEx = new Regex(RegExString);
-                Message = await HttpClientTask;
-
-                MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
-
-                foreach (Match match in Matches)
+                if (DataType.Equals("FT")) //Download TAF and TAF Amends.
                 {
-                    if (match.Success)
+                    foreach (string TAFAmend in TAFAmendArray)
                     {
-                        string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
-                        FileNames.Add(StartDateTime.Hour.ToString("D2") + "/" + tmp.Substring(1, tmp.Length - 2));
+                        for (i = 0; i < 6; i++)
+                        {
+                            StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
+                            StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
+                                + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + "CWAO" + "/"
+                                + StartDateTime.Hour.ToString("D2") + "/";
+                            HomeStationURL = BaseURL + StartDateTimeString;
+
+                            URI = new Uri(HomeStationURL);
+
+                            RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+_" + TAFAmend + "_" + HomeStation + "_[0-9]+<";
+
+                            var HttpClientTask = Client.GetAsync(URI);
+                            RegEx = new Regex(RegExString);
+                            Message = await HttpClientTask;
+
+                            MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
+
+                            foreach (Match match in Matches)
+                            {
+                                if (match.Success)
+                                {
+                                    string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
+                                    string File = tmp.Substring(1, tmp.Length - 2);
+                                    await GetDataUsingHTTP(HomeStationURL + File, DataFolder, File);
+                                    var Text = await FileIO.ReadLinesAsync(DataFile);
+
+                                    foreach (var line in Text.AsEnumerable().Skip(1))
+                                    {
+                                        StatusText.Text += line + "\r\n";
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-            }
 
-            Client.Dispose();
+                else if (DataType.Equals("FB")) //Download Upper Winds.
+                {
+                    for (i = 0; i < 6; i++)
+                    {
+                        StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
+                        StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
+                            + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + "CWAO" + "/"
+                            + StartDateTime.Hour.ToString("D2") + "/";
+                        HomeStationURL = BaseURL + StartDateTimeString;
+
+                        URI = new Uri(HomeStationURL);
+
+                        RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+___+[0-9]+<";
+
+                        var HttpClientTask = Client.GetAsync(URI);
+                        RegEx = new Regex(RegExString);
+                        Message = await HttpClientTask;
+
+                        MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
+
+                        foreach (Match match in Matches)
+                        {
+                            if (match.Success)
+                            {
+                                string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
+                                string File = tmp.Substring(1, tmp.Length - 2);
+                                await GetDataUsingHTTP(HomeStationURL + File, DataFolder, File);
+                                var Text = await FileIO.ReadLinesAsync(DataFile);
+
+                                foreach (var line in Text.AsEnumerable().Skip(1))
+                                {
+                                    StatusText.Text += line + "\r\n";
+                                }
+                            }
+                        }
+                    }
+
+                }
+
+                else if (DataType.Equals("FA")) //Download VFR Route Forecast (available Mar-Oct only).
+                {
+                    for (i = 0; i < 6; i++)
+                    {
+                        StartDateTime = CurrDateTime.Subtract(new TimeSpan(i, 0, 0)); ;
+                        StartDateTimeString = StartDateTime.Year.ToString() + StartDateTime.Month.ToString("D2")
+                            + StartDateTime.Day.ToString("D2") + "/" + DataType + "/" + "CWEG" + "/"
+                            + StartDateTime.Hour.ToString("D2") + "/";
+                        HomeStationURL = BaseURL + "20150805/FA/CWEG/22/";
+
+                        URI = new Uri(HomeStationURL);
+
+                        RegExString = ">[A-Z]+[0-9]+_+[A-Z]+_+[0-9]+___+[0-9]+<";
+
+                        var HttpClientTask = Client.GetAsync(URI);
+                        RegEx = new Regex(RegExString);
+                        Message = await HttpClientTask;
+
+                        MatchCollection Matches = RegEx.Matches(Message.Content.ToString());
+
+                        foreach (Match match in Matches)
+                        {
+                            if (match.Success)
+                            {
+                                string tmp = match.ToString();	//The regular expression matches the "<" and ">" signs around the filename. These signs have to be removed before adding the filename to the list
+                                string File = tmp.Substring(1, tmp.Length - 2);
+                                await GetDataUsingHTTP(HomeStationURL + File, DataFolder, File);
+                                var Text = await FileIO.ReadLinesAsync(DataFile);
+
+                                foreach (var line in Text.AsEnumerable().Skip(1))
+                                {
+                                    StatusText.Text += line + "\r\n";
+                                }
+                            }
+                        }
+                    }
+
+                }
+            }
         }
 
         public async Task GetDataUsingHTTP(string URL, StorageFolder Folder, string File)
@@ -263,10 +306,8 @@ namespace App1
             var Message = await Client.GetAsync(URI);
             var Content = await Message.Content.ReadAsStringAsync();
 
-            DataFile = await Folder.CreateFileAsync(File.Substring(3), CreationCollisionOption.ReplaceExisting);
+            DataFile = await Folder.CreateFileAsync(File, CreationCollisionOption.ReplaceExisting);
             await FileIO.WriteTextAsync(DataFile, Content);
-
-            Client.Dispose();
         }
     }
 }

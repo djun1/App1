@@ -65,7 +65,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <ScrollViewer Grid.Column="1">
-            <TextBlock x:Name="StatusText" Grid.Column="1" SelectionChanged="DownloadButton_Click" TextWrapping="Wrap" Margin="0,0,483,0"/>
+            <TextBlock x:Name="StatusText" Grid.Column="1" SelectionChanged="DownloadButton_Click" TextWrapping="Wrap" Margin="0,0,400,0" FontFamily="Courier New" FontSize="12"/>
             </ScrollViewer>
         </Grid>
     </Grid>

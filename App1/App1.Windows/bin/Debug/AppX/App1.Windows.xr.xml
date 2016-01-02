@@ -44,6 +44,8 @@
     <RootType FullName="Windows.UI.Xaml.Controls.TextBlock">
       <RootProperty Name="TextWrapping" />
       <RootProperty Name="Margin" />
+      <RootProperty Name="FontFamily" />
+      <RootProperty Name="FontSize" />
       <RootProperty Name="Text" />
       <RootProperty Name="Style" />
       <RootProperty Name="IsHitTestVisible" />

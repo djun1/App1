@@ -17,9 +17,4 @@
     </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)XMLParserClass.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <Content Include="$(MSBuildThisFileDirectory)FTCN31_CWAO_250500__CYVR_14056.txt" />
-    <Content Include="$(MSBuildThisFileDirectory)s0000141_e.xml" />
-    <Content Include="$(MSBuildThisFileDirectory)SACN62_CYVR_250200___95784.txt" />
-  </ItemGroup>
 </Project>
